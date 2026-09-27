@@ -33,6 +33,8 @@ export interface SegmentFeedback {
   teacher: string
   text: string
   createdAt: string
+  resolved: boolean
+  reply: string
 }
 
 export interface Attempt {

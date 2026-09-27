@@ -17,6 +17,17 @@ function openDb(): Promise<IDBDatabase> {
   })
 }
 
+function normalizeProject(project: PracticeProject): PracticeProject {
+  for (const attempt of project.attempts ?? []) {
+    for (const item of attempt.feedback ?? []) {
+      // 旧版本练习没有处理标记与回话，按未处理补齐
+      if (typeof item.resolved !== 'boolean') item.resolved = false
+      if (typeof item.reply !== 'string') item.reply = ''
+    }
+  }
+  return project
+}
+
 export async function loadPractice(): Promise<PracticeProject | null> {
   try {
     const db = await openDb()
@@ -27,10 +38,10 @@ export async function loadPractice(): Promise<PracticeProject | null> {
       request.onerror = () => reject(request.error)
     })
     db.close()
-    if (value?.project) return value.project
+    if (value?.project) return normalizeProject(value.project)
   } catch {
     const raw = localStorage.getItem(FALLBACK_KEY)
-    if (raw) return JSON.parse(raw) as PracticeProject
+    if (raw) return normalizeProject(JSON.parse(raw) as PracticeProject)
   }
   return null
 }

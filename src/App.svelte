@@ -3,7 +3,7 @@
   import { ProgressBar } from '@skeletonlabs/skeleton'
   import { createSampleProject } from './sample'
   import { clearPractice, loadPractice, savePractice } from './storage'
-  import type { Attempt, Intonation, PracticeProject, SenseGroup, StressLevel } from './types'
+  import type { Attempt, Intonation, PracticeProject, SegmentFeedback, SenseGroup, StressLevel } from './types'
 
   const intonationOptions: Array<{ value: Intonation; label: string }> = [
     { value: 'fall', label: '下降 ↘' },
@@ -37,6 +37,8 @@
   let issueCategory = '声调'
   let issueNote = ''
   let feedbackText = ''
+  let editingFeedbackId = ''
+  let editingFeedbackText = ''
   let newCategory = ''
   let undoStack: PracticeProject[] = []
   let redoStack: PracticeProject[] = []
@@ -51,6 +53,12 @@
   $: averageAccuracy = selectedAttempt?.scores.length ? Math.round(selectedAttempt.scores.reduce((sum, score) => sum + score.accuracy, 0) / selectedAttempt.scores.length) : 0
   $: averageDeviation = selectedAttempt?.scores.length ? Math.round(selectedAttempt.scores.reduce((sum, score) => sum + score.deviation, 0) / selectedAttempt.scores.length) : 0
   $: totalIssueCategories = project.errorCategories.map((category) => ({ category, count: project.attempts.flatMap((attempt) => attempt.wordIssues).filter((issue) => issue.category === category).length }))
+  $: feedbackProgress = project.groups.map((group, index) => {
+    const rounds = project.attempts.filter((attempt) => attempt.feedback.some((item) => item.groupId === group.id))
+    const items = rounds.flatMap((attempt) => attempt.feedback.filter((item) => item.groupId === group.id))
+    return { group, index, rounds: rounds.length, total: items.length, pending: items.filter((item) => !item.resolved).length }
+  })
+  $: totalPendingFeedback = feedbackProgress.reduce((sum, item) => sum + item.pending, 0)
 
   const clone = <T,>(value: T): T => structuredClone(value)
   const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -317,10 +325,50 @@
         groupId: selectedGroupId,
         teacher: draft.teacher,
         text: feedbackText.trim(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        resolved: false,
+        reply: ''
       })
     })
     feedbackText = ''
+  }
+
+  function mutateFeedback(feedbackId: string, mutator: (item: SegmentFeedback) => void) {
+    editProject((draft) => {
+      for (const attempt of draft.attempts) {
+        const item = attempt.feedback.find((entry) => entry.id === feedbackId)
+        if (item) {
+          mutator(item)
+          return
+        }
+      }
+    })
+  }
+
+  function toggleFeedbackResolved(feedbackId: string) {
+    mutateFeedback(feedbackId, (item) => { item.resolved = !item.resolved })
+  }
+
+  function updateFeedbackReply(feedbackId: string, value: string) {
+    mutateFeedback(feedbackId, (item) => { item.reply = value })
+  }
+
+  function startFeedbackEdit(feedback: SegmentFeedback) {
+    editingFeedbackId = feedback.id
+    editingFeedbackText = feedback.text
+  }
+
+  function saveFeedbackEdit(feedbackId: string) {
+    const text = editingFeedbackText.trim()
+    editingFeedbackId = ''
+    if (!text) return
+    const current = project.attempts.flatMap((attempt) => attempt.feedback).find((item) => item.id === feedbackId)
+    if (!current || current.text === text) return
+    mutateFeedback(feedbackId, (item) => {
+      // 老师改字后这条退回未处理，学生已写的回话保留
+      item.text = text
+      item.resolved = false
+    })
   }
 
   function updateRange(field: 'rangeStart' | 'rangeEnd', value: number) {
@@ -646,14 +694,36 @@
       <div class:recommended={workspaceTab === 'progress'} class="card feedback-card">
         <div class="section-heading">
           <div><span class="eyebrow">TEACHER FEEDBACK</span><h2>逐段反馈</h2></div>
+          <span class="chapter-badge">未销 {selectedAttempt?.feedback.filter((item) => item.groupId === selectedGroupId && !item.resolved).length ?? 0} 条</span>
         </div>
         <div class="feedback-list">
-          {#each selectedAttempt?.feedback.filter((item) => item.groupId === selectedGroupId) ?? [] as feedback}
-            <div class="feedback-item">
-              <strong>{feedback.teacher}</strong>
-              <p>{feedback.text}</p>
-              <small>{new Date(feedback.createdAt).toLocaleString('zh-CN')}</small>
+          {#each selectedAttempt?.feedback.filter((item) => item.groupId === selectedGroupId) ?? [] as feedback (feedback.id)}
+            <div class:resolved={feedback.resolved} class="feedback-item">
+              <div class="feedback-head">
+                <strong>{feedback.teacher}</strong>
+                <span class:done={feedback.resolved} class="feedback-status">{feedback.resolved ? '已处理' : '未处理'}</span>
+              </div>
+              {#if editingFeedbackId === feedback.id}
+                <textarea class="textarea" rows="2" bind:value={editingFeedbackText}></textarea>
+                <div class="feedback-actions">
+                  <button class="btn btn-sm variant-filled-primary" on:click={() => saveFeedbackEdit(feedback.id)}>保存改字</button>
+                  <button class="btn btn-sm variant-ghost" on:click={() => editingFeedbackId = ''}>取消</button>
+                </div>
+              {:else}
+                <p>{feedback.text}</p>
+                <small>{new Date(feedback.createdAt).toLocaleString('zh-CN')}</small>
+                <div class="feedback-actions">
+                  <button class="btn btn-sm variant-soft-primary" on:click={() => toggleFeedbackResolved(feedback.id)}>{feedback.resolved ? '退回未处理' : '✓ 标记已处理'}</button>
+                  <button class="btn btn-sm variant-ghost" on:click={() => startFeedbackEdit(feedback)}>老师改字</button>
+                </div>
+              {/if}
+              <label class="feedback-reply">
+                <span>学生回话</span>
+                <textarea class="textarea" rows="1" placeholder="顺手写一句：怎么改的、还有哪里卡住" value={feedback.reply} on:input={(event) => updateFeedbackReply(feedback.id, event.currentTarget.value)}></textarea>
+              </label>
             </div>
+          {:else}
+            <p class="empty-copy">当前意群本轮还没有反馈。</p>
           {/each}
         </div>
         <label class="label"><span>给当前意群留言</span><textarea class="textarea" rows="2" value={feedbackText} on:input={(event) => feedbackText = event.currentTarget.value} placeholder="教师反馈会绑定到这一轮和这个意群"></textarea></label>
@@ -671,6 +741,25 @@
           <div><strong>{averageAccuracy}%</strong><span>当前准确度</span></div>
           <div><strong>{averageDeviation}%</strong><span>平均偏差</span></div>
           <div><strong>{project.errorCategories.reduce((sum, category) => sum + project.attempts.flatMap((attempt) => attempt.wordIssues).filter((issue) => issue.category === category).length, 0)}</strong><span>错词记录</span></div>
+          <div><strong>{totalPendingFeedback}</strong><span>未销反馈</span></div>
+        </div>
+        <div class="feedback-progress">
+          <div class="feedback-progress-heading">
+            <h3>逐条反馈销账</h3>
+            <span>同一意群多轮反馈合并计算，全销完显示 0</span>
+          </div>
+          <div class="feedback-progress-list">
+            {#each feedbackProgress as item (item.group.id)}
+              <div class:cleared={item.pending === 0} class="feedback-progress-row">
+                <span class="group-index">{String(item.index + 1).padStart(2, '0')}</span>
+                <span class="feedback-progress-copy">
+                  <strong>{item.group.text}</strong>
+                  <small>{item.total ? `${item.rounds} 轮共 ${item.total} 条反馈` : '还没有反馈'}</small>
+                </span>
+                <span class="pending-count"><strong>{item.pending}</strong><small>{item.pending === 0 ? '已销完' : '条未销'}</small></span>
+              </div>
+            {/each}
+          </div>
         </div>
         <div class="category-list">
           {#each totalIssueCategories as category}

@@ -5,6 +5,21 @@ const STORE = 'practice'
 const KEY = 'current'
 const FALLBACK_KEY = 'sologsb-1018-fallback'
 
+// 旧版本练习没有处理标记和学生回话，打开时按未处理补齐。
+export function normalizeProject(project: PracticeProject): PracticeProject {
+  return {
+    ...project,
+    attempts: project.attempts.map((attempt) => ({
+      ...attempt,
+      feedback: (attempt.feedback ?? []).map((item) => ({
+        ...item,
+        resolved: item.resolved ?? false,
+        studentReply: item.studentReply ?? ''
+      }))
+    }))
+  }
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1)
@@ -27,10 +42,10 @@ export async function loadPractice(): Promise<PracticeProject | null> {
       request.onerror = () => reject(request.error)
     })
     db.close()
-    if (value?.project) return value.project
+    if (value?.project) return normalizeProject(value.project)
   } catch {
     const raw = localStorage.getItem(FALLBACK_KEY)
-    if (raw) return JSON.parse(raw) as PracticeProject
+    if (raw) return normalizeProject(JSON.parse(raw) as PracticeProject)
   }
   return null
 }

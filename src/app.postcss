@@ -115,9 +115,29 @@ h2 { margin: 3px 0 0; font-size: 19px; font-weight: 800; letter-spacing: -.02em;
 .issue-item { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 8px; align-items: center; padding: 9px; border: 1px solid #e0e6ea; border-radius: 9px; background: #f9fbfc; }
 .issue-item p { grid-column: 1 / -1; margin: 0; color: #6f7f8c; font-size: 11px; }
 .feedback-item { padding: 10px; border-left: 3px solid #2b8693; border-radius: 0 9px 9px 0; background: #eff6f7; }
+.feedback-item.resolved { border-left-color: #3d9a6c; background: #eef7f1; }
 .feedback-item strong { color: #225f69; font-size: 12px; }
 .feedback-item p { margin: 5px 0; font-size: 12px; line-height: 1.55; }
 .feedback-item small, .empty-copy { color: #84939e; font-size: 10px; }
+.feedback-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.resolve-toggle { flex-shrink: 0; padding: 4px 10px; border: 1px solid #b9cbd3; border-radius: 999px; color: #5f7280; background: #fff; font-size: 10px; font-weight: 700; cursor: pointer; transition: .15s; }
+.resolve-toggle:hover { border-color: #278695; color: #1f6b7a; }
+.resolve-toggle.done { border-color: #3d9a6c; color: #1f6b43; background: #dcf0e4; }
+.feedback-text { margin: 7px 0 5px; font-size: 12px; line-height: 1.55; background: rgba(255,255,255,.72); }
+.feedback-reply { margin-top: 7px; font-size: 12px; background: rgba(255,255,255,.72); }
+.section-subheading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 20px 0 10px; }
+.section-subheading h3 { margin: 0; font-size: 14px; font-weight: 800; }
+.section-subheading span { color: #71808e; font-size: 11px; }
+.feedback-progress-list { display: grid; gap: 8px; }
+.feedback-progress-row { width: 100%; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #dde5ea; border-radius: 10px; color: inherit; background: #f9fbfc; text-align: left; cursor: pointer; transition: .15s; }
+.feedback-progress-row:hover { border-color: #278695; background: #eef6f7; }
+.row-text { min-width: 0; }
+.row-text strong, .row-text small { display: block; }
+.row-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.row-text small { margin-top: 3px; color: #7c8a97; font-size: 10px; }
+.open-count { display: inline-flex; align-items: baseline; gap: 4px; padding: 5px 11px; border-radius: 999px; color: #8a4d12; background: #f8e2bd; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.open-count strong { font-size: 15px; }
+.open-count.cleared { color: #1f6b43; background: #dcf0e4; }
 .progress-dashboard { grid-column: 1 / -1; }
 .progress-grid { grid-template-columns: repeat(4, 1fr); }
 .progress-grid > div { display: grid; padding: 14px; border-radius: 11px; background: #f2f6f8; text-align: center; }

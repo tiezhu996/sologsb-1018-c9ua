@@ -32,8 +32,8 @@ export function createSampleProject(): PracticeProject {
           { id: 'issue-2', groupId: 'group-3', word: '信', category: '韵尾', note: '前鼻音收得不稳。' }
         ],
         feedback: [
-          { id: 'feedback-1', groupId: 'group-2', teacher: '陈老师', text: '“掠”字再轻一点，把重音留给后面的“旧码头”。', createdAt: new Date(Date.now() - 82000000).toISOString() },
-          { id: 'feedback-2', groupId: 'group-3', teacher: '陈老师', text: '“她”和“信”的重音层次可以更清楚，中间停顿缩短约半拍。', createdAt: new Date(Date.now() - 81000000).toISOString() }
+          { id: 'feedback-1', groupId: 'group-2', teacher: '陈老师', text: '“掠”字再轻一点，把重音留给后面的“旧码头”。', createdAt: new Date(Date.now() - 82000000).toISOString(), resolved: true, studentReply: '已把“掠”字放轻，重音移到“旧码头”，请老师再听听。' },
+          { id: 'feedback-2', groupId: 'group-3', teacher: '陈老师', text: '“她”和“信”的重音层次可以更清楚，中间停顿缩短约半拍。', createdAt: new Date(Date.now() - 81000000).toISOString(), resolved: false, studentReply: '停顿已缩到半拍以内，下一轮录完再标。' }
         ],
         selfNote: '整体偏慢，第三段气息不足。'
       },
@@ -52,7 +52,7 @@ export function createSampleProject(): PracticeProject {
           { id: 'issue-3', groupId: 'group-3', word: '信', category: '韵尾', note: '比上一轮稳定。' }
         ],
         feedback: [
-          { id: 'feedback-3', groupId: 'group-3', teacher: '陈老师', text: '节奏明显改善，下一轮注意句尾“回答”的两层语调。', createdAt: new Date(Date.now() - 35000000).toISOString() }
+          { id: 'feedback-3', groupId: 'group-3', teacher: '陈老师', text: '节奏明显改善，下一轮注意句尾“回答”的两层语调。', createdAt: new Date(Date.now() - 35000000).toISOString(), resolved: false, studentReply: '' }
         ],
         selfNote: '第二意群衔接自然了。'
       }

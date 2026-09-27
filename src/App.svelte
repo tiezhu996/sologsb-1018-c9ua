@@ -51,6 +51,12 @@
   $: averageAccuracy = selectedAttempt?.scores.length ? Math.round(selectedAttempt.scores.reduce((sum, score) => sum + score.accuracy, 0) / selectedAttempt.scores.length) : 0
   $: averageDeviation = selectedAttempt?.scores.length ? Math.round(selectedAttempt.scores.reduce((sum, score) => sum + score.deviation, 0) / selectedAttempt.scores.length) : 0
   $: totalIssueCategories = project.errorCategories.map((category) => ({ category, count: project.attempts.flatMap((attempt) => attempt.wordIssues).filter((issue) => issue.category === category).length }))
+  $: feedbackProgress = project.groups.map((group) => {
+    const items = project.attempts.flatMap((attempt) => attempt.feedback).filter((item) => item.groupId === group.id)
+    const rounds = project.attempts.filter((attempt) => attempt.feedback.some((item) => item.groupId === group.id)).length
+    return { group, total: items.length, rounds, open: items.filter((item) => !item.resolved).length }
+  })
+  $: totalOpenFeedback = feedbackProgress.reduce((sum, row) => sum + row.open, 0)
 
   const clone = <T,>(value: T): T => structuredClone(value)
   const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -317,10 +323,41 @@
         groupId: selectedGroupId,
         teacher: draft.teacher,
         text: feedbackText.trim(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        resolved: false,
+        studentReply: ''
       })
     })
     feedbackText = ''
+  }
+
+  function toggleFeedbackResolved(feedbackId: string) {
+    editProject((draft) => {
+      const feedback = draft.attempts.find((item) => item.id === selectedAttemptId)?.feedback.find((item) => item.id === feedbackId)
+      if (feedback) feedback.resolved = !feedback.resolved
+    })
+  }
+
+  function updateFeedbackText(feedbackId: string, value: string) {
+    editProject((draft) => {
+      const feedback = draft.attempts.find((item) => item.id === selectedAttemptId)?.feedback.find((item) => item.id === feedbackId)
+      if (!feedback || feedback.text === value) return
+      // 老师改了字，这条退回未处理；学生回话保留。
+      feedback.text = value
+      feedback.resolved = false
+    })
+  }
+
+  function updateFeedbackReply(feedbackId: string, value: string) {
+    editProject((draft) => {
+      const feedback = draft.attempts.find((item) => item.id === selectedAttemptId)?.feedback.find((item) => item.id === feedbackId)
+      if (feedback) feedback.studentReply = value
+    })
+  }
+
+  function goToGroupFeedback(groupId: string) {
+    selectGroup(groupId)
+    if (window.innerWidth <= 820) workspaceTab = 'review'
   }
 
   function updateRange(field: 'rangeStart' | 'rangeEnd', value: number) {
@@ -646,15 +683,21 @@
       <div class:recommended={workspaceTab === 'progress'} class="card feedback-card">
         <div class="section-heading">
           <div><span class="eyebrow">TEACHER FEEDBACK</span><h2>逐段反馈</h2></div>
+          <span class="chapter-badge">{selectedAttempt?.feedback.filter((item) => item.groupId === selectedGroupId).filter((item) => !item.resolved).length ?? 0} 条未销</span>
         </div>
         <div class="feedback-list">
           {#each selectedAttempt?.feedback.filter((item) => item.groupId === selectedGroupId) ?? [] as feedback}
-            <div class="feedback-item">
-              <strong>{feedback.teacher}</strong>
-              <p>{feedback.text}</p>
-              <small>{new Date(feedback.createdAt).toLocaleString('zh-CN')}</small>
+            <div class:resolved={feedback.resolved} class="feedback-item">
+              <div class="feedback-head">
+                <strong>{feedback.teacher}</strong>
+                <button class:done={feedback.resolved} class="resolve-toggle" on:click={() => toggleFeedbackResolved(feedback.id)}>{feedback.resolved ? '✓ 已处理' : '标为已处理'}</button>
+              </div>
+              <textarea class="textarea feedback-text" rows="2" value={feedback.text} on:input={(event) => updateFeedbackText(feedback.id, event.currentTarget.value)}></textarea>
+              <small>{new Date(feedback.createdAt).toLocaleString('zh-CN')} · {feedback.resolved ? '已处理' : '未处理'}，改字会退回未处理</small>
+              <input class="input feedback-reply" placeholder="学生回话：改了什么、还有什么疑问" value={feedback.studentReply} on:input={(event) => updateFeedbackReply(feedback.id, event.currentTarget.value)} />
             </div>
           {/each}
+          {#if !selectedAttempt?.feedback.some((item) => item.groupId === selectedGroupId)}<p class="empty-copy">本轮这个意群还没有反馈。</p>{/if}
         </div>
         <label class="label"><span>给当前意群留言</span><textarea class="textarea" rows="2" value={feedbackText} on:input={(event) => feedbackText = event.currentTarget.value} placeholder="教师反馈会绑定到这一轮和这个意群"></textarea></label>
         <button class="btn btn-sm variant-filled-tertiary" on:click={addFeedback}>留下反馈</button>
@@ -671,6 +714,22 @@
           <div><strong>{averageAccuracy}%</strong><span>当前准确度</span></div>
           <div><strong>{averageDeviation}%</strong><span>平均偏差</span></div>
           <div><strong>{project.errorCategories.reduce((sum, category) => sum + project.attempts.flatMap((attempt) => attempt.wordIssues).filter((issue) => issue.category === category).length, 0)}</strong><span>错词记录</span></div>
+        </div>
+        <div class="section-subheading">
+          <h3>逐段反馈销账</h3>
+          <span>{totalOpenFeedback ? `全部意群还有 ${totalOpenFeedback} 条未销` : '所有反馈都已销完'}</span>
+        </div>
+        <div class="feedback-progress-list">
+          {#each feedbackProgress as row, index (row.group.id)}
+            <button class="feedback-progress-row" on:click={() => goToGroupFeedback(row.group.id)}>
+              <span class="group-index">{String(index + 1).padStart(2, '0')}</span>
+              <span class="row-text">
+                <strong>{row.group.text}</strong>
+                <small>{row.total ? `共 ${row.total} 条反馈 · 跨 ${row.rounds} 轮合并` : '还没有收到反馈'}</small>
+              </span>
+              <span class:cleared={row.open === 0} class="open-count"><strong>{row.open}</strong> 条未销</span>
+            </button>
+          {/each}
         </div>
         <div class="category-list">
           {#each totalIssueCategories as category}
